@@ -4,10 +4,10 @@ package com.mydrive.drive.folder.dto;
 import java.time.Instant;
 import java.util.UUID;
 
-public record FolderResponse(UUID id, UUID parentId, String name, Instant createdAt, Instant updatedAt){}
-
-/*
- * PHASE 2C TODO: Decide whether clients need ownerId in this response. It is
- * safe to include the authenticated owner's UUID, but it is not required for
- * folder navigation. Regardless, Folder must store ownerId internally.
+/**
+ * Folder data needed by a client to render folder navigation.
+ *
+ * ownerId is deliberately omitted. The server gets the owner from the logged-in
+ * session and applies it in repository queries; clients neither need nor control it.
  */
+public record FolderResponse(UUID id, UUID parentId, String name, Instant createdAt, Instant updatedAt){}

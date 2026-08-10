@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class FolderService{
@@ -23,7 +24,10 @@ public class FolderService{
     public FolderResponse createFolder(CreateFolderRequest request){
         var now = java.time.Instant.now();
         var currentUser = currentUserService.requireCurrentUser();
-        var folder = new Folder(java.util.UUID.randomUUID(), request.parentId(), request.name(), now, now, currentUser.getId());
+        UUID ownerId = currentUser.getId();
+        validateActiveParent(request.parentId(), ownerId);
+
+        var folder = new Folder(java.util.UUID.randomUUID(), request.parentId(), request.name(), now, now, ownerId, null);
         var savedFolder = folderRepository.save(folder);
         return toResponse(savedFolder);
     }
@@ -31,12 +35,26 @@ public class FolderService{
     @Transactional(readOnly=true)
     public List<FolderResponse> listFolders(){
         var currentUser = currentUserService.requireCurrentUser();
-        return folderRepository.findAllByOwnerId(currentUser.getId()).stream().map(this::toResponse).toList();
+        return folderRepository.findAllByOwnerIdAndDeletedAtIsNull(currentUser.getId())
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private void validateActiveParent(UUID parentId, UUID ownerId) {
+        if (parentId == null) {
+            return;
+        }
+
+        Folder parent = folderRepository.findByIdAndOwnerId(parentId, ownerId)
+                .orElseThrow(() -> new FolderNotFoundException(parentId));
+        if (parent.isDeleted()) {
+            throw new FolderNotFoundException(parentId);
+        }
     }
 
     private FolderResponse toResponse(Folder folder){
         return new FolderResponse(folder.getId(), folder.getParentId(), folder.getName(), folder.getCreatedAt(), folder.getUpdatedAt());
     }
 }
-
 

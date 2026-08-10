@@ -30,16 +30,20 @@ public class Folder {
     @Column(name = "owner_id", nullable = false, updatable = false)
     private UUID ownerId;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     protected Folder() {
         // JPA requires a no-argument constructor
     }
 
-    public Folder(UUID id, UUID parentId, String name, Instant createdAt, Instant updatedAt, UUID ownerId) {
+    public Folder(UUID id, UUID parentId, String name, Instant createdAt, Instant updatedAt, UUID ownerId, Instant deletedAt) {
         this.id = id;
         this.parentId = parentId;
         this.name = name;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.deletedAt = deletedAt;
         this.ownerId = ownerId;
     }
 
@@ -66,5 +70,34 @@ public class Folder {
     public UUID getOwnerId() {
         return ownerId;
     }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void rename(String new_name, Instant updatedAt) {
+        this.name = new_name;
+        this.updatedAt = updatedAt;
+    }
+
+    public void move(Instant updatedAt, UUID newParentId) {
+        this.parentId = newParentId;
+        this.updatedAt = updatedAt;
+    }
+
+    public void moveToTrash(Instant updatedAt) {
+        this.deletedAt = updatedAt;
+        this.updatedAt = updatedAt;
+    }
+
+    public void restore(Instant updatedAt) {
+        this.deletedAt = null;
+        this.updatedAt = updatedAt;
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
+    }
+
 }
 

@@ -34,3 +34,4 @@ build/
 .env
 data/
 uploads/
+design_doc.md

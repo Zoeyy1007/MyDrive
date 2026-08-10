@@ -12,8 +12,10 @@ import java.util.List;
 @RequestMapping("/api/folders")
 public class FolderController{
     private final FolderService folderService;
-    public FolderController(FolderService folderService){
+    private final FolderCommandService folderCommandService;
+    public FolderController(FolderService folderService, FolderCommandService folderCommandService){
         this.folderService = folderService;
+        this.folderCommandService = folderCommandService;
     }
 
     @PostMapping
@@ -25,5 +27,26 @@ public class FolderController{
     @GetMapping
     public List<FolderResponse> listFolders(){
         return folderService.listFolders();
+    }
+
+    @PatchMapping(path = "/{id}/rename")
+    public FolderResponse renameFolder(@PathVariable java.util.UUID id, @Valid @RequestBody com.mydrive.drive.folder.dto.RenameFolderRequest request){
+        return folderCommandService.rename(id, request);
+    }
+
+    @PatchMapping(path = "/{id}/move")
+    public FolderResponse moveFolder(@PathVariable java.util.UUID id, @Valid @RequestBody com.mydrive.drive.folder.dto.MoveFolderRequest request){
+        return folderCommandService.move(id, request);
+    }
+
+    @DeleteMapping(path = "/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteFolder(@PathVariable java.util.UUID id) {
+        folderCommandService.moveToTrash(id);
+    }
+
+    @PostMapping(path = "/{id}/restore")
+    public FolderResponse restoreFolder(@PathVariable java.util.UUID id) {
+        return folderCommandService.restore(id);
     }
 }

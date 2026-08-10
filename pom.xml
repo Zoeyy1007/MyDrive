@@ -31,6 +31,18 @@
 	</properties>
 	<dependencies>
 		<dependency>
+			<groupId>io.minio</groupId>
+			<artifactId>minio</artifactId>
+			<version>9.0.2</version>
+		</dependency>
+		<!-- MinIO 9 publishes OkHttp as a multiplatform artifact. Maven needs
+		     the JVM variant explicitly for HttpUrl and MediaType. -->
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>okhttp-jvm</artifactId>
+			<version>5.3.2</version>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>

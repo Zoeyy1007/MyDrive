@@ -13,10 +13,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
@@ -47,7 +50,8 @@ class FolderServiceTests{
                 "Test Folder",
                 Instant.now(),
                 Instant.now(),
-                ownerId
+                ownerId,
+                null
         );
 
         when(currentUserService.requireCurrentUser()).thenReturn(currentUser);
@@ -84,11 +88,12 @@ class FolderServiceTests{
                 "Test Folder",
                 Instant.now(),
                 Instant.now(),
-                ownerId
+                ownerId,
+                null
         );
 
         when(currentUserService.requireCurrentUser()).thenReturn(currentUser);
-        when(folderRepository.findAllByOwnerId(ownerId)).thenReturn(java.util.List.of(folder));
+        when(folderRepository.findAllByOwnerIdAndDeletedAtIsNull(ownerId)).thenReturn(java.util.List.of(folder));
         java.util.List<FolderResponse> result = folderService.listFolders();
         assertThat(result).hasSize(1);
         assertThat(result.get(0).name()).isEqualTo(folder.getName());
@@ -98,6 +103,42 @@ class FolderServiceTests{
         assertThat(result.get(0).id()).isEqualTo(folder.getId());
 
         verify(currentUserService).requireCurrentUser();
-        verify(folderRepository).findAllByOwnerId(ownerId);
+        verify(folderRepository).findAllByOwnerIdAndDeletedAtIsNull(ownerId);
+    }
+
+    @Test
+    void createFolderAcceptsActiveOwnedParent() {
+        UUID ownerId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        AppUser currentUser = new AppUser(ownerId, "user@example.com", "hash", Instant.now());
+        Folder parent = folder(parentId, null, ownerId, null);
+
+        when(currentUserService.requireCurrentUser()).thenReturn(currentUser);
+        when(folderRepository.findByIdAndOwnerId(parentId, ownerId)).thenReturn(Optional.of(parent));
+        when(folderRepository.save(any(Folder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        FolderResponse result = folderService.createFolder(new CreateFolderRequest("Child", parentId));
+
+        assertThat(result.parentId()).isEqualTo(parentId);
+        verify(folderRepository).save(any(Folder.class));
+    }
+
+    @Test
+    void createFolderRejectsMissingOrForeignParent() {
+        UUID ownerId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        when(currentUserService.requireCurrentUser())
+                .thenReturn(new AppUser(ownerId, "user@example.com", "hash", Instant.now()));
+        when(folderRepository.findByIdAndOwnerId(parentId, ownerId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> folderService.createFolder(new CreateFolderRequest("Child", parentId)))
+                .isInstanceOf(FolderNotFoundException.class);
+
+        verify(folderRepository, never()).save(any());
+    }
+
+    private Folder folder(UUID id, UUID parentId, UUID ownerId, Instant deletedAt) {
+        Instant now = Instant.now();
+        return new Folder(id, parentId, "Folder", now, now, ownerId, deletedAt);
     }
 }

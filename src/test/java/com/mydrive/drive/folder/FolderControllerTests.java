@@ -36,6 +36,9 @@ class FolderControllerTests{
     @MockitoBean
     FolderService folderService;
 
+    @MockitoBean
+    FolderCommandService folderCommandService;
+
     @Autowired
     private ObjectMapper objectMapper;
 
