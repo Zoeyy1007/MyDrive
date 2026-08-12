@@ -11,6 +11,9 @@ import com.mydrive.drive.folder.FolderRepository;
 import com.mydrive.drive.security.CurrentUserService;
 import com.mydrive.drive.storage.StorageKeyFactory;
 import com.mydrive.drive.storage.StorageService;
+import com.mydrive.drive.sync.RelativePathService;
+import com.mydrive.drive.sync.SyncChangeService;
+import com.mydrive.drive.sync.SyncOperation;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,12 +23,15 @@ import java.util.UUID;
 
 @Service
 public class FileCommandService{
+    /* File mutations and their sync events commit in the same transaction. */
     private final DriveFileRepository driveFileRepository;
     private final CurrentUserService currentUserService;
     private final StorageService storageService;
     private final StorageKeyFactory storageKeyFactory;
     private final FileVersionRepository fileVersionRepository;
     private final FolderRepository folderRepository;
+    private final RelativePathService relativePathService;
+    private final SyncChangeService syncChangeService;
 
     public FileCommandService(
             DriveFileRepository driveFileRepository,
@@ -33,32 +39,45 @@ public class FileCommandService{
             StorageService storageService,
             StorageKeyFactory storageKeyFactory,
             FileVersionRepository fileVersionRepository,
-            FolderRepository folderRepository) {
+            FolderRepository folderRepository,
+            RelativePathService relativePathService,
+            SyncChangeService syncChangeService) {
         this.driveFileRepository = driveFileRepository;
         this.currentUserService = currentUserService;
         this.storageService = storageService;
         this.storageKeyFactory = storageKeyFactory;
         this.fileVersionRepository = fileVersionRepository;
         this.folderRepository = folderRepository;
+        this.relativePathService = relativePathService;
+        this.syncChangeService = syncChangeService;
     }
 
     @Transactional
     public FileResponse rename(UUID fileId, RenameFileRequest request){
         UUID ownerId = currentUserService.requireCurrentUser().getId();
         DriveFile file = requireOwnedReadyFile(fileId, ownerId, false);
+        String previousPath = relativePathService.pathForFile(
+                ownerId, null, file.getParentFolderId(), file.getName());
         file.rename(request.name(), Instant.now());
-        return toResponse(driveFileRepository.save(file));
+        DriveFile saved = driveFileRepository.save(file);
+        syncChangeService.recordFileChange(saved, SyncOperation.RENAMED, previousPath);
+        return toResponse(saved);
     }
 
     @Transactional
     public FileResponse move(UUID fileId, MoveFileRequest request){
         UUID ownerId = currentUserService.requireCurrentUser().getId();
         DriveFile file = requireOwnedReadyFile(fileId, ownerId, false);
+        String previousPath = relativePathService.pathForFile(
+                ownerId, null, file.getParentFolderId(), file.getName());
         validateDestination(request.parentFolderId(), ownerId);
         file.move(request.parentFolderId(), Instant.now());
-        return toResponse(driveFileRepository.save(file));
+        DriveFile saved = driveFileRepository.save(file);
+        syncChangeService.recordFileChange(saved, SyncOperation.MOVED, previousPath);
+        return toResponse(saved);
     }
 
+    @Transactional
     public FileResponse copy(UUID fileId, CopyFileRequest request){
         UUID ownerId = currentUserService.requireCurrentUser().getId();
         DriveFile source = requireOwnedReadyFile(fileId, ownerId, false);
@@ -98,7 +117,9 @@ public class FileCommandService{
         try {
             storageService.copy(sourceVersion.getStorageKey(), newStorageKey);
             copiedFile.markReady();
-            return toResponse(driveFileRepository.save(copiedFile));
+            DriveFile saved = driveFileRepository.save(copiedFile);
+            syncChangeService.recordFileChange(saved, SyncOperation.CREATED, null);
+            return toResponse(saved);
         } catch (RuntimeException exception) {
             copiedFile.markFailed();
             driveFileRepository.save(copiedFile);
@@ -111,7 +132,8 @@ public class FileCommandService{
         UUID ownerId = currentUserService.requireCurrentUser().getId();
         DriveFile file = requireOwnedReadyFile(fileId, ownerId, false);
         file.moveToTrash(Instant.now());
-        driveFileRepository.save(file);
+        DriveFile saved = driveFileRepository.save(file);
+        syncChangeService.recordFileChange(saved, SyncOperation.DELETED, null);
     }
 
     @Transactional
@@ -120,7 +142,9 @@ public class FileCommandService{
         DriveFile file = requireOwnedReadyFile(fileId, ownerId, true);
         validateDestination(file.getParentFolderId(), ownerId);
         file.restore(Instant.now());
-        return toResponse(driveFileRepository.save(file));
+        DriveFile saved = driveFileRepository.save(file);
+        syncChangeService.recordFileChange(saved, SyncOperation.RESTORED, null);
+        return toResponse(saved);
     }
 
     private DriveFile requireOwnedReadyFile(UUID fileId, UUID ownerId, boolean allowDeleted) {

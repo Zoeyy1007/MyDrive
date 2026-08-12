@@ -7,17 +7,20 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 @Entity
 @Table(name = "files")
 public class DriveFile {
+
+    @jakarta.persistence.Version
+    @Column(name = "lock_version", nullable = false)
+    private Long lockVersion;
 
     @Id
     @Column(nullable = false, updatable = false)
@@ -147,6 +150,10 @@ public class DriveFile {
         return deletedAt;
     }
 
+    public Long getLockVersion() {
+        return lockVersion;
+    }
+
     public void rename(String new_name, Instant updatedAt) {
         this.name = new_name;
         this.updatedAt = updatedAt;
@@ -171,6 +178,30 @@ public class DriveFile {
         return this.deletedAt != null;
     }
 
+    public void promoteVersion(
+            int newVersion,
+            String newChecksum,
+            long newSize,
+            String newContentType,
+            Instant updatedAt) {
+        if (newVersion != currentVersion + 1) {
+            throw new IllegalArgumentException(
+                    "New version must be exactly one greater than the current version");
+        }
+        if (newChecksum == null || newChecksum.length() != 64) {
+            throw new IllegalArgumentException("Checksum must contain exactly 64 characters");
+        }
+        if (newSize < 0) {
+            throw new IllegalArgumentException("File size cannot be negative");
+        }
+        if (newContentType == null || newContentType.isBlank()) {
+            throw new IllegalArgumentException("Content type cannot be blank");
+        }
+
+        this.currentVersion = newVersion;
+        this.checksum = newChecksum;
+        this.size = newSize;
+        this.contentType = newContentType;
+        this.updatedAt = Objects.requireNonNull(updatedAt, "updatedAt cannot be null");
+    }
 }
-
-

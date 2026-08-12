@@ -4,6 +4,8 @@ import com.mydrive.drive.account.AppUser;
 import com.mydrive.drive.folder.dto.MoveFolderRequest;
 import com.mydrive.drive.folder.dto.RenameFolderRequest;
 import com.mydrive.drive.security.CurrentUserService;
+import com.mydrive.drive.sync.RelativePathService;
+import com.mydrive.drive.sync.SyncChangeService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -29,6 +31,12 @@ class FolderCommandServiceTests{
 
     @Mock
     private CurrentUserService currentUserService;
+
+    @Mock
+    private RelativePathService relativePathService;
+
+    @Mock
+    private SyncChangeService syncChangeService;
 
     @InjectMocks
     private FolderCommandService folderCommandService;

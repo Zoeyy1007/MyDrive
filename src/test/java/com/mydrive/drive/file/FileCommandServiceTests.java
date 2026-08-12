@@ -9,6 +9,8 @@ import com.mydrive.drive.folder.FolderRepository;
 import com.mydrive.drive.security.CurrentUserService;
 import com.mydrive.drive.storage.StorageKeyFactory;
 import com.mydrive.drive.storage.StorageService;
+import com.mydrive.drive.sync.RelativePathService;
+import com.mydrive.drive.sync.SyncChangeService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -40,6 +42,8 @@ class FileCommandServiceTests {
     @Mock StorageKeyFactory storageKeyFactory;
     @Mock FileVersionRepository fileVersionRepository;
     @Mock FolderRepository folderRepository;
+    @Mock RelativePathService relativePathService;
+    @Mock SyncChangeService syncChangeService;
 
     @InjectMocks FileCommandService fileCommandService;
 

@@ -1,6 +1,8 @@
 
 package com.mydrive.drive.security;
 
+import com.mydrive.drive.device.DeviceAuthenticationFilter;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -8,9 +10,14 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
 @Configuration
 public class SecurityConfig{
+
+    /* Browser sessions and Bearer device tokens share the same security chain. */
 
     @Bean
     PasswordEncoder passwordEncoder(){
@@ -18,19 +25,33 @@ public class SecurityConfig{
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception{
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            ObjectProvider<DeviceAuthenticationFilter> deviceFilterProvider) throws Exception{
         http
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
+                        "/",
+                        "/index.html",
+                        "/styles.css",
+                        "/app.js",
                         "/api/auth/register",
                         "/api/auth/login",
+                        "/api/auth/csrf",
                         "/api/hello/**"
                 ).permitAll()
                 .anyRequest().authenticated()
             )
-            // CSRF is disabled while this project is being exercised directly through
-            // Postman. Re-enable it when a browser frontend is added before deployment.
-            .csrf(csrf -> csrf.disable())
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                // Bearer tokens are not browser session cookies, so they are not
+                // vulnerable to the browser-based request forgery CSRF prevents.
+                .ignoringRequestMatchers(request -> {
+                    String authorization = request.getHeader("Authorization");
+                    return authorization != null && authorization.startsWith("Bearer ");
+                })
+            )
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint((request, response, exception) ->
                     response.sendError(HttpStatus.UNAUTHORIZED.value(), "Unauthorized"))
@@ -45,6 +66,11 @@ public class SecurityConfig{
                 .logoutUrl("/api/auth/logout")
                 .logoutSuccessHandler((request, response, authentication) -> response.setStatus(HttpStatus.NO_CONTENT.value()))
             );
+
+        deviceFilterProvider.ifAvailable(deviceFilter ->
+                http.addFilterBefore(
+                        deviceFilter,
+                        UsernamePasswordAuthenticationFilter.class));
 
         return http.build();
     }

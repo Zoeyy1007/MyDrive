@@ -35,3 +35,9 @@ build/
 data/
 uploads/
 design_doc.md
+
+# Phase 7 sync-client local secrets/state
+sync-client/sync-client.properties
+sync-client/*.db
+sync-client/*.db-*
+sync-client/target/

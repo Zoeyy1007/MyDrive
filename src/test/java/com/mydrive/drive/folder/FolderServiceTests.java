@@ -5,6 +5,7 @@ import com.mydrive.drive.account.AppUser;
 import com.mydrive.drive.folder.dto.CreateFolderRequest;
 import com.mydrive.drive.folder.dto.FolderResponse;
 import com.mydrive.drive.security.CurrentUserService;
+import com.mydrive.drive.sync.SyncChangeService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -30,6 +31,9 @@ class FolderServiceTests{
 
     @Mock
     private CurrentUserService currentUserService;
+
+    @Mock
+    private SyncChangeService syncChangeService;
 
     @InjectMocks
     private FolderService folderService;

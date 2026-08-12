@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MyDrive dashboard</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+</head>
+<body>
+<div class="shell">
+    <header class="brandbar">
+        <a class="brand" href="/" aria-label="MyDrive home">
+            <span class="brand-mark">M</span>
+            <span>MyDrive</span>
+        </a>
+        <span class="environment">local dashboard</span>
+    </header>
+
+    <main>
+        <section id="auth-view" class="auth-layout">
+            <div class="intro">
+                <p class="eyebrow">Your files, your machines</p>
+                <h1>A quiet place to manage your sync.</h1>
+                <p>Sign in to choose a remote folder, register a computer, and download its client configuration.</p>
+            </div>
+
+            <div class="auth-cards">
+                <form id="login-form" class="panel">
+                    <div>
+                        <p class="eyebrow">Welcome back</p>
+                        <h2>Sign in</h2>
+                    </div>
+                    <label>Email<input name="email" type="email" autocomplete="username" required></label>
+                    <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+                    <button type="submit">Sign in</button>
+                    <p id="login-message" class="form-message" role="status"></p>
+                </form>
+
+                <form id="register-form" class="panel secondary-panel">
+                    <div>
+                        <p class="eyebrow">First visit?</p>
+                        <h2>Create an account</h2>
+                    </div>
+                    <label>Email<input name="email" type="email" autocomplete="email" required></label>
+                    <label>Password<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+                    <button type="submit" class="secondary-button">Register</button>
+                    <p id="register-message" class="form-message" role="status"></p>
+                </form>
+            </div>
+        </section>
+
+        <section id="dashboard-view" class="dashboard" hidden>
+            <div class="dashboard-heading">
+                <div>
+                    <p class="eyebrow">Sync overview</p>
+                    <h1>Good to see you.</h1>
+                    <p id="user-email" class="muted"></p>
+                </div>
+                <div class="heading-actions">
+                    <button id="refresh-button" class="ghost-button" type="button">Refresh</button>
+                    <button id="logout-button" class="secondary-button" type="button">Sign out</button>
+                </div>
+            </div>
+
+            <div class="stats" aria-label="Account summary">
+                <article><span id="folder-count">0</span><small>remote folders</small></article>
+                <article><span id="device-count">0</span><small>registered devices</small></article>
+                <article><span id="current-count">0</span><small>up to date</small></article>
+            </div>
+
+            <div class="dashboard-grid">
+                <section class="panel wide-panel">
+                    <div class="section-heading">
+                        <div><p class="eyebrow">Remote structure</p><h2>Sync folders</h2></div>
+                        <form id="folder-form" class="inline-form">
+                            <input name="name" maxlength="255" placeholder="New root folder" aria-label="New root folder name" required>
+                            <button type="submit">Create</button>
+                        </form>
+                    </div>
+                    <p class="muted small">A device beside a folder means that computer is configured to synchronize it.</p>
+                    <div id="folder-list" class="folder-list"></div>
+                </section>
+
+                <section class="panel setup-panel">
+                    <div><p class="eyebrow">New computer</p><h2>Generate client properties</h2></div>
+                    <form id="device-form" class="stack-form">
+                        <label>Device name<input name="name" maxlength="100" placeholder="Zoey Windows PC" required></label>
+                        <label>Remote folder<select name="selectedFolderId" id="setup-folder" required></select></label>
+                        <label>Local folder path<input name="localRoot" placeholder="C:/Users/zoeyy/MyDrive" required></label>
+                        <div class="two-columns">
+                            <label>Poll seconds<input name="pollSeconds" type="number" min="1" value="10" required></label>
+                            <label>Full scan seconds<input name="scanSeconds" type="number" min="1" value="60" required></label>
+                        </div>
+                        <label>Maximum changes per request<input name="maxChangeBatch" type="number" min="1" max="500" value="100" required></label>
+                        <label>Ignore patterns<input name="ignore" value=".DS_Store,Thumbs.db,.trash/**,*.tmp"></label>
+                        <button type="submit">Register and download</button>
+                    </form>
+                    <p class="privacy-note">The local path and raw token are written only into the downloaded file. The server never stores either value. Database and MinIO settings remain server-only.</p>
+                    <p id="device-message" class="form-message" role="status"></p>
+                </section>
+
+                <section class="panel wide-panel">
+                    <div><p class="eyebrow">Computers</p><h2>Device status</h2></div>
+                    <div id="device-list" class="device-list"></div>
+                </section>
+
+                <section class="panel">
+                    <div><p class="eyebrow">Developer view</p><h2>Quick API access</h2></div>
+                    <div class="endpoint-list">
+                        <button type="button" data-endpoint="/api/auth/me"><code>GET /api/auth/me</code><span>Open</span></button>
+                        <button type="button" data-endpoint="/api/folders"><code>GET /api/folders</code><span>Open</span></button>
+                        <button type="button" data-endpoint="/api/devices"><code>GET /api/devices</code><span>Open</span></button>
+                        <button type="button" data-endpoint="/api/sync/changes?after=0&amp;limit=20"><code>GET /api/sync/changes</code><span>Open</span></button>
+                    </div>
+                    <pre id="endpoint-result" aria-live="polite">Choose an endpoint to inspect its JSON.</pre>
+                </section>
+            </div>
+        </section>
+    </main>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

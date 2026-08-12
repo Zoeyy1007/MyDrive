@@ -120,6 +120,7 @@ class FileControllerTests {
         when(fileCommandService.copy(eq(sourceId), any())).thenReturn(response);
 
         mockMvc.perform(post("/api/files/{id}/copy", sourceId)
+                        .with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("{\"parentFolderId\":null,\"name\":\"copy.txt\"}"))
                 .andExpect(status().isCreated())

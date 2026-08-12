@@ -18,6 +18,7 @@ import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.any;
 
@@ -37,6 +38,7 @@ class AuthControllerTests {
 
         when(accountService.register(any(RegisterRequest.class))).thenReturn(userResponse);
         mockMvc.perform(post("/api/auth/register")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"email\":\"user@example.com\",\"password\":\"plaintextPassword\"}"))
                 .andExpect(status().isCreated())
@@ -48,6 +50,7 @@ class AuthControllerTests {
     @Test
     void registerRejectsInvalidEmailWith400() throws Exception {
         mockMvc.perform(post("/api/auth/register")
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"not-an-email\",\"password\":\"plaintextPassword\"}"))
                 .andExpect(status().isBadRequest());

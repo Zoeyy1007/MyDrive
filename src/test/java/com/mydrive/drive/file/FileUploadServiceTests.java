@@ -11,6 +11,7 @@ import com.mydrive.drive.storage.StorageException;
 import com.mydrive.drive.storage.StorageKeyFactory;
 import com.mydrive.drive.storage.StorageService;
 import com.mydrive.drive.storage.StoredObject;
+import com.mydrive.drive.sync.SyncChangeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -66,6 +67,9 @@ class FileUploadServiceTests {
 
     @Mock
     private TransactionTemplate transactionTemplate;
+
+    @Mock
+    private SyncChangeService syncChangeService;
 
     @InjectMocks
     private FileUploadService fileUploadService;

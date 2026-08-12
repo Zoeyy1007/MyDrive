@@ -9,6 +9,8 @@ import com.mydrive.drive.security.CurrentUserService;
 import com.mydrive.drive.storage.StorageKeyFactory;
 import com.mydrive.drive.storage.StorageException;
 import com.mydrive.drive.storage.StorageService;
+import com.mydrive.drive.sync.SyncChangeService;
+import com.mydrive.drive.sync.SyncOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,7 @@ import java.util.UUID;
 
 @Service
 public class FileUploadService {
+    /* A successful finalization records CREATED in the metadata transaction. */
     private static final Logger logger = LoggerFactory.getLogger(FileUploadService.class);
     private static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
 
@@ -38,6 +41,7 @@ public class FileUploadService {
     private final StorageKeyFactory storageKeyFactory;
     private final ChecksumService checksumService;
     private final TransactionTemplate transactionTemplate;
+    private final SyncChangeService syncChangeService;
 
     public FileUploadService(
             FileVersionRepository fileVersionRepository,
@@ -47,7 +51,8 @@ public class FileUploadService {
             StorageService storageService,
             StorageKeyFactory storageKeyFactory,
             ChecksumService checksumService,
-            TransactionTemplate transactionTemplate) {
+            TransactionTemplate transactionTemplate,
+            SyncChangeService syncChangeService) {
         this.fileVersionRepository = fileVersionRepository;
         this.driveFileRepository = driveFileRepository;
         this.folderRepository = folderRepository;
@@ -56,6 +61,7 @@ public class FileUploadService {
         this.storageKeyFactory = storageKeyFactory;
         this.checksumService = checksumService;
         this.transactionTemplate = transactionTemplate;
+        this.syncChangeService = syncChangeService;
     }
 
     public FileResponse upload(UUID parentFolderId, MultipartFile multipartFile) {
@@ -136,7 +142,9 @@ public class FileUploadService {
             driveFile = Objects.requireNonNull(
                     transactionTemplate.execute(status -> {
                         readyFile.markReady();
-                        return driveFileRepository.save(readyFile);
+                        DriveFile saved = driveFileRepository.save(readyFile);
+                        syncChangeService.recordFileChange(saved, SyncOperation.CREATED, null);
+                        return saved;
                     }),
                     "Ready file transaction returned null"
             );

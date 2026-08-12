@@ -14,8 +14,12 @@ import java.util.UUID;
 @Entity
 @Table(name = "file_versions")
 public class FileVersion {
+
+    @Column(name = "source_device_id", updatable = false)
+    private UUID sourceDeviceId;
+
     @Id
-    @Column(nullable = false, updatable = false)
+    @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
 
     @Column(name = "file_id", nullable = false, updatable = false)
@@ -53,6 +57,19 @@ public class FileVersion {
             long size,
             UUID createdBy,
             Instant createdAt) {
+        this(id, fileId, versionNumber, storageKey, checksum, size, createdBy, createdAt, null);
+    }
+
+    public FileVersion(
+            UUID id,
+            UUID fileId,
+            int versionNumber,
+            String storageKey,
+            String checksum,
+            long size,
+            UUID createdBy,
+            Instant createdAt,
+            UUID sourceDeviceId) {
         this.id = id;
         this.fileId = fileId;
         this.versionNumber = versionNumber;
@@ -61,6 +78,7 @@ public class FileVersion {
         this.size = size;
         this.createdBy = createdBy;
         this.createdAt = createdAt;
+        this.sourceDeviceId = sourceDeviceId;
     }
 
     public UUID getId() {
@@ -93,5 +111,9 @@ public class FileVersion {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public UUID getSourceDeviceId() {
+        return sourceDeviceId;
     }
 }

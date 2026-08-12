@@ -18,6 +18,12 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler{
 
+    /*
+     * PHASE 5 TODO:
+     * Add FileVersionNotFoundException to the resource-not-found handler so it
+     * returns the same ApiError shape and HTTP 404 as FileNotFoundException.
+     */
+
     @ExceptionHandler(EmailAlreadyExistsException.class)
     public ResponseEntity<ApiError> handleDuplicateEmail(
             EmailAlreadyExistsException exception, HttpServletRequest request){

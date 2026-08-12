@@ -4,6 +4,8 @@ package com.mydrive.drive.folder;
 import com.mydrive.drive.folder.dto.CreateFolderRequest;
 import com.mydrive.drive.folder.dto.FolderResponse;
 import com.mydrive.drive.security.CurrentUserService;
+import com.mydrive.drive.sync.SyncChangeService;
+import com.mydrive.drive.sync.SyncOperation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -12,12 +14,18 @@ import java.util.UUID;
 
 @Service
 public class FolderService{
+    /* Folder creation records its sync event in the same transaction. */
     private final FolderRepository folderRepository;
     private final CurrentUserService currentUserService;
+    private final SyncChangeService syncChangeService;
 
-    public FolderService(FolderRepository folderRepository, CurrentUserService currentUserService){
+    public FolderService(
+            FolderRepository folderRepository,
+            CurrentUserService currentUserService,
+            SyncChangeService syncChangeService){
         this.folderRepository = folderRepository;
         this.currentUserService = currentUserService;
+        this.syncChangeService = syncChangeService;
     }
 
     @Transactional
@@ -29,6 +37,7 @@ public class FolderService{
 
         var folder = new Folder(java.util.UUID.randomUUID(), request.parentId(), request.name(), now, now, ownerId, null);
         var savedFolder = folderRepository.save(folder);
+        syncChangeService.recordFolderChange(savedFolder, SyncOperation.CREATED, null);
         return toResponse(savedFolder);
     }
 
@@ -57,4 +66,3 @@ public class FolderService{
         return new FolderResponse(folder.getId(), folder.getParentId(), folder.getName(), folder.getCreatedAt(), folder.getUpdatedAt());
     }
 }
-

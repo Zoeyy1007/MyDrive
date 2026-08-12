@@ -1,0 +1,11 @@
+# Copy this file to sync-client.properties. The copied file is ignored by Git.
+server.base-url=http://localhost:8080
+sync.local-root=C:/Users/zoeyy/MyDriveSyncTest
+sync.remote-folder-id=REPLACE_WITH_REMOTE_FOLDER_UUID
+device.id=REPLACE_WITH_DEVICE_UUID
+device.token=REPLACE_WITH_ONE_TIME_DEVICE_TOKEN
+sync.poll-seconds=10
+sync.full-scan-seconds=60
+sync.max-change-batch=100
+sync.ignore=.DS_Store,Thumbs.db,.trash/**,*.tmp,.obsidian/workspace.json
+
