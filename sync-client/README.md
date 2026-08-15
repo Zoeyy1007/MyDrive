@@ -75,6 +75,13 @@ Run:
 java -jar sync-client-0.0.1-SNAPSHOT.jar sync-client.properties
 ```
 
+If `sync.local-root` is missing, the client opens a directory chooser on this
+computer. To change an existing selection, run:
+
+```powershell
+java -jar sync-client-0.0.1-SNAPSHOT.jar sync-client.properties --choose-folder
+```
+
 ## macOS configuration
 
 Copy the jar and example properties to the Mac. Use the same server URL and
@@ -98,9 +105,27 @@ Run:
 java -jar sync-client-0.0.1-SNAPSHOT.jar sync-client.properties
 ```
 
+The same `--choose-folder` option opens the local directory chooser on macOS.
+After the choice is saved, normal background starts do not open a window.
+
 The server address must be reachable from both computers. `localhost` works
 only when the server runs on that same computer. Open port 8080 only on a
 trusted network and allow Java through the host firewall if necessary.
+
+## Transfer timing logs
+
+The sync client writes timing information to its standard output/error stream:
+
+```text
+UPLOAD completed path=video.mp4 bytes=52428800 durationMs=4210 rateMiBps=11.88
+DOWNLOAD completed path=video.mp4 bytes=52428800 durationMs=3890 rateMiBps=12.85
+Sync cycle completed trigger=filesystem-watcher durationMs=4450
+Watcher-triggered sync finished events=2 detectionToCompletionMs=4753
+```
+
+When running in the background, redirect both output streams to a log file.
+Tokens are not printed. File paths are included, so treat the log as private if
+filenames are sensitive.
 
 ## Safe first test
 

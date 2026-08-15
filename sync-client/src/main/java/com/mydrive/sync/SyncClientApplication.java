@@ -11,6 +11,7 @@ import com.mydrive.sync.filesystem.LocalFileScanner;
 import com.mydrive.sync.filesystem.PortablePathResolver;
 import com.mydrive.sync.http.SyncApiClient;
 import com.mydrive.sync.state.LocalStateStore;
+import com.mydrive.sync.ui.SyncFolderChooser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,11 +29,9 @@ public final class SyncClientApplication {
     private SyncClientApplication() {}
 
     public static void main(String[] args) {
-        Path properties = args.length == 0
-                ? Path.of("sync-client.properties")
-                : Path.of(args[0]);
         try {
-            start(properties);
+            LaunchOptions options = LaunchOptions.parse(args);
+            start(options.propertiesFile(), options.chooseFolder());
         } catch (Exception exception) {
             System.err.println("MyDrive sync could not start: " + exception.getMessage());
             System.exit(1);
@@ -40,6 +39,11 @@ public final class SyncClientApplication {
     }
 
     static void start(Path propertiesFile) throws Exception {
+        start(propertiesFile, false);
+    }
+
+    static void start(Path propertiesFile, boolean chooseFolder) throws Exception {
+        SyncFolderChooser.configure(propertiesFile, chooseFolder);
         SyncClientConfig config = SyncClientConfig.load(propertiesFile);
         Files.createDirectories(config.localRoot());
         Path internalDirectory = config.localRoot().resolve(".mydrive");
@@ -60,13 +64,21 @@ public final class SyncClientApplication {
         SyncEngine engine = new SyncEngine(
                 config, scanner, stateStore, apiClient, writer, pathResolver);
 
-        engine.syncOnce();
+        engine.syncOnce("startup");
         ScheduledExecutorService executor = Executors.newScheduledThreadPool(2);
-        Runnable safeSync = () -> {
+        Runnable safeScheduledSync = () -> {
             try {
-                engine.syncOnce();
+                engine.syncOnce("scheduled-full-scan");
             } catch (Exception exception) {
                 logger.error("Synchronization cycle failed", exception);
+            }
+        };
+        java.util.function.BooleanSupplier safeWatcherSync = () -> {
+            try {
+                return engine.syncOnce("filesystem-watcher");
+            } catch (Exception exception) {
+                logger.error("Watcher-triggered synchronization failed", exception);
+                return false;
             }
         };
         Runnable safePoll = () -> {
@@ -82,13 +94,13 @@ public final class SyncClientApplication {
                 config.pollInterval().toSeconds(),
                 TimeUnit.SECONDS);
         executor.scheduleWithFixedDelay(
-                safeSync,
+                safeScheduledSync,
                 config.fullScanInterval().toSeconds(),
                 config.fullScanInterval().toSeconds(),
                 TimeUnit.SECONDS);
 
         DirectoryWatcher watcher = new DirectoryWatcher(
-                config.localRoot(), ignores, () -> executor.execute(safeSync));
+                config.localRoot(), ignores, safeWatcherSync);
         watcher.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
@@ -101,5 +113,27 @@ public final class SyncClientApplication {
         }, "mydrive-shutdown"));
 
         logger.info("MyDrive sync started: {}", config.safeSummary());
+    }
+
+    private record LaunchOptions(Path propertiesFile, boolean chooseFolder) {
+        private static LaunchOptions parse(String[] args) {
+            Path propertiesFile = null;
+            boolean chooseFolder = false;
+            for (String argument : args) {
+                if ("--choose-folder".equals(argument)) {
+                    chooseFolder = true;
+                } else if (propertiesFile == null) {
+                    propertiesFile = Path.of(argument);
+                } else {
+                    throw new IllegalArgumentException(
+                            "Usage: java -jar sync-client.jar [properties-file] [--choose-folder]");
+                }
+            }
+            return new LaunchOptions(
+                    propertiesFile == null
+                            ? Path.of("sync-client.properties")
+                            : propertiesFile,
+                    chooseFolder);
+        }
     }
 }

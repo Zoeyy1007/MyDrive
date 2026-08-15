@@ -13,6 +13,8 @@ import com.mydrive.sync.http.dto.RemoteFolder;
 import com.mydrive.sync.state.LocalFileState;
 import com.mydrive.sync.state.LocalStateStore;
 import com.mydrive.sync.state.SyncStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,13 +29,17 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class SyncEngine {
+    private static final Logger logger = LoggerFactory.getLogger(SyncEngine.class);
+
     private final SyncClientConfig config;
     private final LocalFileScanner scanner;
     private final LocalStateStore stateStore;
@@ -59,13 +65,28 @@ public class SyncEngine {
 
     /** Returns false when another watcher/timer cycle is already running. */
     public boolean syncOnce() throws Exception {
-        if (!cycleLock.tryLock()) return false;
+        return syncOnce("manual");
+    }
+
+    public boolean syncOnce(String trigger) throws Exception {
+        if (!cycleLock.tryLock()) {
+            logger.debug("Sync cycle skipped trigger={} reason=another-cycle-is-running", trigger);
+            return false;
+        }
+        long started = System.nanoTime();
+        logger.info("Sync cycle started trigger={}", trigger);
         try {
             RemoteFolderTree folders = RemoteFolderTree.from(
                     apiClient.listFolders(), config.remoteFolderId());
             synchronizeLocalChanges(folders);
             pollAndApplyRemoteChanges(folders.rootPath());
+            logger.info("Sync cycle completed trigger={} durationMs={}",
+                    trigger, elapsedMillis(started));
             return true;
+        } catch (Exception exception) {
+            logger.warn("Sync cycle failed trigger={} durationMs={} reason={}",
+                    trigger, elapsedMillis(started), exception.getMessage());
+            throw exception;
         } finally {
             cycleLock.unlock();
         }
@@ -85,20 +106,28 @@ public class SyncEngine {
     }
 
     private void synchronizeLocalChanges(RemoteFolderTree folders) throws Exception {
+        long scanStarted = System.nanoTime();
         Map<String, ScannedFile> snapshot = scanner.scan(config.localRoot());
         Map<String, LocalFileState> stored = byPath(stateStore.findAll());
+        logger.debug("Local scan completed files={} previousStates={} durationMs={}",
+                snapshot.size(), stored.size(), elapsedMillis(scanStarted));
 
         for (ScannedFile local : snapshot.values()) {
             LocalFileState previous = stored.get(local.relativePath());
             if (previous == null || previous.remoteResourceId() == null) {
                 UUID parentId = folders.ensureParentFor(local.relativePath(), apiClient);
+                long transferStarted = System.nanoTime();
                 UUID remoteId = apiClient.uploadNewFile(
                         local.relativePath(), local.absolutePath(), parentId);
                 stateStore.upsert(synced(local, remoteId, 1));
+                logTransfer("UPLOAD", local.relativePath(), local.size(), transferStarted);
             } else if (!local.checksum().equalsIgnoreCase(previous.checksum())) {
+                long transferStarted = System.nanoTime();
                 int version = apiClient.uploadNewVersion(
                         previous.remoteResourceId(), local.absolutePath());
                 stateStore.upsert(synced(local, previous.remoteResourceId(), version));
+                logTransfer("UPLOAD_VERSION", local.relativePath(),
+                        local.size(), transferStarted);
             } else if (local.size() != previous.size()
                     || local.modifiedMillis() != previous.modifiedMillis()
                     || previous.status() != SyncStatus.SYNCED) {
@@ -113,6 +142,7 @@ public class SyncEngine {
                     && previous.remoteResourceId() != null) {
                 apiClient.deleteFile(previous.remoteResourceId());
                 stateStore.delete(previous.relativePath());
+                logger.info("DELETE completed path={}", previous.relativePath());
             }
         }
     }
@@ -122,6 +152,12 @@ public class SyncEngine {
         boolean more;
         do {
             RemoteChangeBatch batch = apiClient.getChanges(cursor, config.maxChangeBatch());
+            if (batch.changes().isEmpty()) {
+                logger.debug("Remote poll completed changes=0 cursor={}", cursor);
+            } else {
+                logger.info("Remote poll received changes={} cursorFrom={} cursorTo={}",
+                        batch.changes().size(), cursor, batch.nextSequence());
+            }
             applyRemoteBatch(batch, rootPath);
             cursor = batch.nextSequence();
             more = batch.hasMore();
@@ -211,6 +247,7 @@ public class SyncEngine {
             RemoteChange change,
             String relativePath,
             Map<String, LocalFileState> states) throws Exception {
+        long transferStarted = System.nanoTime();
         RemoteFileMetadata metadata = apiClient.getFile(change.resourceId());
         Path destination;
         try (InputStream input = apiClient.downloadFile(change.resourceId())) {
@@ -227,6 +264,7 @@ public class SyncEngine {
                 attrs.lastModifiedTime().toMillis(),
                 SyncStatus.SYNCED,
                 Instant.now()));
+        logTransfer("DOWNLOAD", relativePath, attrs.size(), transferStarted);
     }
 
     private void applyFolderChange(
@@ -328,6 +366,27 @@ public class SyncEngine {
         Map<String, LocalFileState> result = new LinkedHashMap<>();
         for (LocalFileState state : states) result.put(state.relativePath(), state);
         return result;
+    }
+
+    private void logTransfer(
+            String operation,
+            String relativePath,
+            long bytes,
+            long startedNanos) {
+        long elapsedNanos = Math.max(1, System.nanoTime() - startedNanos);
+        long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(elapsedNanos);
+        double mebibytesPerSecond =
+                (bytes / 1_048_576.0) / (elapsedNanos / 1_000_000_000.0);
+        logger.info("{} completed path={} bytes={} durationMs={} rateMiBps={}",
+                operation,
+                relativePath,
+                bytes,
+                elapsedMillis,
+                String.format(Locale.ROOT, "%.2f", mebibytesPerSecond));
+    }
+
+    private static long elapsedMillis(long startedNanos) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos);
     }
 
     private static final class RemoteFolderTree {
